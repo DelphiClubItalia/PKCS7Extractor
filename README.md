@@ -3,7 +3,7 @@
 ![PKCS#7 Extractor library for Delphi](Documentation/pkcs7extractory_logo.png)
 # PKCS#7 Extractor library for Delphi
 
-This is a project born from the need to simply extract .P7M files content in Delphi applications.\
+This project is born from the need to simply extract .P7M files content in Delphi applications.\
 Recently italian developers are facing the new centralized digital invoicing system which will be mandatory by law starting January 1st, 2019.\
 Digital invoices are basically rappresented into XML files that are then digitally signed using CAdES-BES mode.\
 Developers managing invoices need to generate those XMLs and be able to read them back, but when a digitally signed invoice is enveloped into a .P7M file many of them ended up stripping it down by finding the position of the opening XML tag and the closing tag and then copying that part of the file.\
@@ -35,6 +35,10 @@ We thought this couldn't be the professional way of managing this task, so we st
 ### [PKCS7Extractor.pas](Source/PKCS7Extractor.pas)
 ### What it is and how does it work
 This is the main unit developers will deal with. It exports some useful functions to deal with PKCS#7 messages.
+This is a wrapper for the [OpenSSL](https://www.openssl.org/)'s Libeay32.dll file. Please keep in mind that this is a minimal wrapper written to include only the functions required for PKCS#7 extraction and it's not intended to become a full wrapper.\
+It also does not work like a regular wrapper: when loaded it it first searches for already present instances of the library and attaches to that, if library is not currently in memory it will try to load it like a normal wrapper would do.\
+But when unloaded this wrapper will only clear it's variables and will not free loaded library from memory. This was designed in this way because this shouldn't be used as a main source for [OpenSSL](https://www.openssl.org/) interfacing and considering that other components/libraries could be present in the application unloading the library could drive to catastrophic results.\
+This behaviour will be safe for working along to others' works.
 
 ### Exported functions
 Every exported function has an history so long nobody would believe us. So let be clear, this was not so easy after all, but now it will be easy to go as follows. Let's begin decribe the functions for the wrapper of [OpenSSL](https://www.openssl.org/) functions.
@@ -460,37 +464,40 @@ Every compatibility issues reported will be appreciated.
 
 We would like to be able to achieve the full compatibility to every Delphi (and maybe FreePascal too), but we need others to help us testing with compilers we don't own. For each unchecked compiler we're waiting for someone to get in touch with us sending the compiled binaries.
 
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 2\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 3\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 4\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 5\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 6\
-:white_check_mark: [Borland](https://www.embarcadero.com/) Delphi 7\
-:thought_balloon: [Borland](https://www.embarcadero.com/) DevelopDelphier Studio 2005\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 2006\
-:thought_balloon: Turbo Delphi 2006\
-:white_check_mark: [CodeGear](https://www.embarcadero.com/) Delphi 2007\
-:white_check_mark: [Embarcadero](https://www.embarcadero.com/) Delphi 2009\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 2010\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE2 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE3 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE4 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE5 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE6 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE7 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE8 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10 Seattle (32 and 64 bit)\
-:white_check_mark: [Embarcadero](https://www.embarcadero.com/) Delphi 10.1 Berlin (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10.2 Tokyo (32 and 64 bit) *on it's way, will arrive soon...*\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10.3 Rio (32 and 64 bit) *on it's way, will arrive soon...*
+| Version | x86 | x64 | Notes |
+|---------|-----|-----|-------|
+| [Borland](https://www.embarcadero.com/) Delphi 2 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 3 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 4 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 5 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 6 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 7 | :white_check_mark: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 2005 | :thought_balloon: | *N/A* |  |
+| [Borland](https://www.embarcadero.com/) Delphi 2006 | :thought_balloon: | *N/A* |  |
+| Turbo Delphi 2006 | :thought_balloon: | *N/A* |  |
+| [CodeGear](https://www.embarcadero.com/) Delphi 2007 | :white_check_mark: | *N/A* |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 2009 | :thought_balloon: | *N/A* |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 2010 | :thought_balloon: | *N/A* |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE | :thought_balloon: | *N/A* |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE2 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE3 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE4 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE5 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE6 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE7 | :white_check_mark: | :white_check_mark: | Thanks Diego Rigoni |
+| [Embarcadero](https://www.embarcadero.com/) Delphi XE8 | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 10 Seattle | :thought_balloon: | :thought_balloon: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 10.1 Berlin | :white_check_mark: | :white_check_mark: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 10.2 Tokyo | :white_check_mark: | :white_check_mark: |  |
+| [Embarcadero](https://www.embarcadero.com/) Delphi 10.3 Rio | :white_check_mark: | :white_check_mark: | Thanks Diego Rigoni |
 
 ## Projects for the future
 
 - Manage signature to verify it's validity.
-- Have the tests results of all Delphi versions, making a network of volunteers to be able to provide these on each new release.
+- Managing certificate store to select what CAs are authoritative.
+- Have the tests results for all Delphi versions, managing a network of volunteers to be able to provide these on each new release.
 - Making this unit compatible with all versions of Delphi.
-- Making this compatible with [Free Pascal](https://www.freepascal.org/).
+- Making this compatible with [Free Pascal](https://www.freepascal.org/) **ON IT'S WAY!!!**.
 - Compatibility with all possible versions of [OpenSSL](https://www.openssl.org/).
 
 ## Thanks
@@ -498,6 +505,7 @@ We would like to be able to achieve the full compatibility to every Delphi (and 
 - [Delphi Club Italia](http://www.delphiclubitalia.it/) [Facebook page](https://www.facebook.com/groups/delphiclubitalia)
 - [Christian Cristofori](https://github.com/zizzo81)
 - [Giancarlo Oneglio](http://www.onix.it/)
+- Diego Rigoni
 
 ## Comments
 Any suggestion, contribution and comment will be appreciated.
