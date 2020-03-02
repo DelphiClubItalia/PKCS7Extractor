@@ -1,15 +1,19 @@
 unit MainFormUnit;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 {***************************************************************************}
 {                                                                           }
 {     PKCS#7 Extractor for Delphi Demo Application                          }
-{     Version 1.0.0.0 released November, 23nd 2018                          }
+{     Version 1.2.0.0 released March, 2nd 2020                              }
 {                                                                           }
 {     Copyright (C) 2018 Delphi Club Italia                                 }
 {                        http://www.delphiclubitalia.it                     }
 {                                                                           }
 {     Original authors:                                                     }
-{         Christian Cristofori         pkcs7reader@christiancristofori.it   }
+{         Christian Cristofori              github@christiancristofori.it   }
 {         Giancarlo Oneglio                   giancarlo.oneglio@gmail.com   }
 {                                                                           }
 {***************************************************************************}
@@ -35,7 +39,8 @@ unit MainFormUnit;
 
 interface
 
-uses Forms, Classes, Dialogs, Controls, ExtCtrls, StdCtrls, Menus, Graphics,
+uses
+  Forms, Classes, Dialogs, Controls, ExtCtrls, StdCtrls, Menus, Graphics,
   PKCS7Extractor;
 
 type
@@ -55,8 +60,10 @@ type
     bBrowse: TButton;
     labelLocationL: TLabel;
     labelVersionL: TLabel;
-    cboVerification: TComboBox;
     lblVerification: TLabel;
+    lblSignatureMode: TLabel;
+    lblSignatureModeValue: TLabel;
+    lblVerificationValue: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ChangeLibrary(Sender: TObject);
@@ -64,7 +71,6 @@ type
     procedure GoToWebsite(Sender: TObject);
   private
     procedure RefreshPanel;
-    function GetVerification: TVerificationOption;
   end;
 
 var
@@ -74,10 +80,22 @@ implementation
 
 {$R *.dfm}
 
-uses Windows, SysUtils, ShellAPI, ShlObj, ActiveX;
+uses
+{$IFnDEF FPC}
+  ShellAPI,
+{$ELSE}
+  LCLIntf, LCLType,
+{$ENDIF}
+  Windows, SysUtils, ShlObj, ActiveX;
+
+{$IFDEF FPC}
+type
+  BFFCALLBACK = function(Wnd: HWND; uMsg: UINT; lParam, lpData: LPARAM): Integer stdcall;
+  TFNBFFCallBack = type BFFCALLBACK;
+{$ENDIF}
 
 var
-    mInitialFolder: String = ''; // NOT THREAD SAFE! (WHO CARES HERE?)
+  mInitialFolder: String = ''; // NOT THREAD SAFE! (WHO CARES HERE?)
 
 function lpfnBrowseProc(Wnd: HWND; uMsg: UINT; lParam, lpData: LPARAM): Integer; stdcall;
 begin
@@ -99,7 +117,8 @@ begin
   try
     SHGetMalloc(Malloc);
 
-    FillChar(BrowseInfo, SizeOf(BrowseInfo), #0);
+    StrPCopy(szDisplayNameBuff, AMessage);
+    FillChar(BrowseInfo, SizeOf(TBrowseInfo), #0);
     BrowseInfo.hwndOwner := AHandle;
     BrowseInfo.pidlRoot := pidlStart;
     BrowseInfo.pszDisplayName := szDisplayNameBuff;
@@ -132,29 +151,36 @@ begin
       Application.MessageBox('WARNING: unloading a DLL can be dangerous if you use multiple libraries to manage it''s functions.'#13#10 +
         'This is a controlled example and we don''t have any other library refering to this module in memory or to it''s functions, but '+
         'you should always pay attention because references are not checked again and this will lead to serious crashes.', 'WARNING', MB_ICONEXCLAMATION);
-    PKCS7Extractor.Unload();
+    PKCS7Extractor.Unload;
     FreeLibrary(GetModuleHandle(LIBEAY32_LIBRARY));
     PKCS7Extractor.SetFolder(F);
-    PKCS7Extractor.Load()
+    PKCS7Extractor.Load
   end;
-  RefreshPanel()
+  RefreshPanel
 end;
 
 procedure TFormMain.ExtractPKCS7(Sender: TObject);
+const
+  SIGNATURE_MODE: Array[TSignatureMode] of String = ('(unknown)', 'PKCS#7', 'CMS');
+  VERIFY_STATUS: Array[TVerifyStatus] of String = ('(unknown/invalid)', 'full verification', 'partial verification');
 var
   sFolder, sFile, sExtension, S: String;
 begin
-  sFolder := GetCurrentDir();
+  sFolder := GetCurrentDir;
   try
-    memoSource.Lines.Clear();
-    if not PKCS7Extractor.Load() then begin
+    memoSource.Lines.Clear;
+    lblSignatureModeValue.Caption := SIGNATURE_MODE[smUnknown];
+    lblVerificationValue.Caption := '(idle)';
+    if not PKCS7Extractor.Load then begin
       Application.MessageBox('Library Libeay32.dll has not been found or an error occurre while loading.', 'Extraction report', MB_ICONEXCLAMATION);
       Exit
     end;
-    RefreshPanel();
-    if not odInput.Execute() then Exit;
-    if not Verify(odInput.FileName, GetVerification()) then begin
+    RefreshPanel;
+    if not odInput.Execute then
+      Exit;
+    if Verify(odInput.FileName) = vsUnknown then begin
       Application.MessageBox('Selected file is not a supported PKCS#7 message file.', 'Extraction report', MB_ICONEXCLAMATION);
+      lblVerificationValue.Caption := VERIFY_STATUS[vsUnknown];
       Exit
     end;
     sFile := ExpandFilename(ChangeFileExt(odInput.FileName, ''));
@@ -171,18 +197,23 @@ begin
           if Length(sExtension) > 0 then
             sdOutput.Filter := Format('%s file (*.%s)|*.%s|Any file (*.*)|*.*', [sExtension, sExtension, sExtension]);
           sdOutput.DefaultExt := sExtension;
-          if not sdOutput.Execute() then
+          if not sdOutput.Execute then
             Exit;
           sFile := sdOutput.FileName
         end;
         ID_CANCEL: Exit
       end;
-    if Extract(odInput.FileName, sFile, GetVerification()) then begin
-      if ExtractToString(odInput.FileName, S, GetVerification()) then
+    lblVerificationValue.Caption := VERIFY_STATUS[vsUnknown];
+    if Extract(odInput.FileName, sFile) then begin
+      lblSignatureModeValue.Caption := SIGNATURE_MODE[SignatureMode(odInput.FileName)];
+      S := '';
+      if ExtractToString(odInput.FileName, S) then
         memoSource.Lines.Text := S;
-      Application.MessageBox(PChar(Format('Content of the PKCS#7 message file has been extracted and saved successfully to file "%s".', [sFile])), 'Extraction report', MB_ICONINFORMATION)
-    end else
+      lblVerificationValue.Caption := VERIFY_STATUS[Verify(odInput.FileName)];
+      Application.MessageBox(PChar(Format('Content of the PKCS#7 message file has been extracted and saved successfully to file "%s".', [sFile])), 'Extraction report', MB_ICONINFORMATION);
+    end else begin
       Application.MessageBox('Error while extracting data from PKCS#7 message file.', 'Extraction report', MB_ICONEXCLAMATION)
+    end
   finally
     SetCurrentDir(sFolder)
   end
@@ -190,37 +221,41 @@ end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
-  memoSource.Lines.Clear();
+  memoSource.Lines.Clear;
   memoSource.Font.Name := 'Courier New';
-  PKCS7Extractor.Load();
-  RefreshPanel()
+  PKCS7Extractor.Load;
+  RefreshPanel
 end;
 
 procedure TFormMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  if Key = VK_ESCAPE then Application.Terminate()
-  else if Key = VK_F1 then GoToWebsite(Sender)
-end;
-
-function TFormMain.GetVerification: TVerificationOption;
-begin
-  Result := TVerificationOption(cboVerification.ItemIndex);
+  if Key = VK_ESCAPE then
+    Application.Terminate
+  else
+    if Key = VK_F1 then
+      GoToWebsite(Sender)
 end;
 
 procedure TFormMain.GoToWebsite(Sender: TObject);
 begin
-  ShellExecute(Handle, 'open', 'http://www.delphiclubitalia.it', nil, nil, SW_SHOWMAXIMIZED)
+{$IFDEF FPC}
+  OpenURL('http://www.delphiclubitalia.it')
+{$ELSE}
+  ShellExecute(0, 'open', 'http://www.delphiclubitalia.it', nil, nil, SW_SHOWMAXIMIZED)
+{$ENDIF}
 end;
 
 procedure TFormMain.RefreshPanel;
 var
   S: String;
 begin
-  S := PKCS7Extractor.GetFolder();
-  if Length(S) = 0 then S := '(unknown)';
+  S := PKCS7Extractor.GetFolder;
+  if Length(S) = 0 then
+    S := '(unknown)';
   labelLocation.Caption := S;
-  S := PKCS7Extractor.GetVersion();
-  if Length(S) = 0 then S := '(unknown)';
+  S := PKCS7Extractor.GetVersion;
+  if Length(S) = 0 then
+    S := '(unknown)';
   labelVersion.Caption := S
 end;
 

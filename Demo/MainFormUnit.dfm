@@ -24,28 +24,48 @@ object FormMain: TFormMain
   TextHeight = 13
   object lblVerification: TLabel
     Left = 8
-    Top = 146
+    Top = 193
     Width = 57
     Height = 13
     Caption = '&Verification:'
-    FocusControl = cboVerification
+  end
+  object lblSignatureMode: TLabel
+    Left = 8
+    Top = 212
+    Width = 79
+    Height = 13
+    Caption = 'Signature Mode:'
+  end
+  object lblSignatureModeValue: TLabel
+    Left = 128
+    Top = 212
+    Width = 51
+    Height = 13
+    Caption = '(unknown)'
+  end
+  object lblVerificationValue: TLabel
+    Left = 128
+    Top = 193
+    Width = 24
+    Height = 13
+    Caption = '(idle)'
   end
   object bExtract: TButton
     Left = 8
-    Top = 171
+    Top = 146
     Width = 647
     Height = 41
     Anchors = [akLeft, akTop, akRight]
     Caption = 'Extract PKCS#7 message file...'
     Default = True
-    TabOrder = 2
+    TabOrder = 1
     OnClick = ExtractPKCS7
   end
   object memoSource: TMemo
     Left = 8
-    Top = 218
+    Top = 231
     Width = 647
-    Height = 252
+    Height = 239
     Anchors = [akLeft, akTop, akRight, akBottom]
     BevelInner = bvNone
     BevelKind = bkFlat
@@ -55,7 +75,7 @@ object FormMain: TFormMain
     PopupMenu = popupEmpty
     ReadOnly = True
     ScrollBars = ssBoth
-    TabOrder = 3
+    TabOrder = 2
     WordWrap = False
   end
   object panelLibrary: TPanel
@@ -67,7 +87,7 @@ object FormMain: TFormMain
     BevelOuter = bvLowered
     Color = clWindow
     ParentBackground = False
-    TabOrder = 4
+    TabOrder = 3
     object labelLocation: TLabel
       Left = 96
       Top = 8
@@ -107,7 +127,7 @@ object FormMain: TFormMain
     BevelOuter = bvNone
     Color = 12608789
     ParentBackground = False
-    TabOrder = 5
+    TabOrder = 4
     OnClick = GoToWebsite
   end
   object pnlHeader: TPanel
@@ -118,7 +138,7 @@ object FormMain: TFormMain
     Cursor = crHandPoint
     Align = alTop
     BevelOuter = bvNone
-    TabOrder = 6
+    TabOrder = 5
     OnClick = GoToWebsite
     object imgDCILogo: TImage
       Left = 590
@@ -548,32 +568,17 @@ object FormMain: TFormMain
     TabOrder = 0
     OnClick = ChangeLibrary
   end
-  object cboVerification: TComboBox
-    Left = 128
-    Top = 143
-    Width = 527
-    Height = 22
-    Style = csOwnerDrawFixed
-    Anchors = [akLeft, akTop, akRight]
-    ItemIndex = 0
-    TabOrder = 1
-    Text = 'voNone'
-    Items.Strings = (
-      'voNone'
-      'voVerify'
-      'voSignature')
-  end
   object odInput: TOpenDialog
     DefaultExt = '*.p7m'
     Filter = 'PCKS#7 Message file (*.p7m)|*.p7m|Any file (*.*)|*.*'
     Title = 'Select PKCS#7 Message file...'
-    Left = 80
-    Top = 192
+    Left = 336
+    Top = 8
   end
   object sdOutput: TSaveDialog
     Title = 'Extract file to...'
-    Left = 128
-    Top = 192
+    Left = 384
+    Top = 8
   end
   object popupEmpty: TPopupMenu
     Left = 528

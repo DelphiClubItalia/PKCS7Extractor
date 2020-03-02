@@ -5,13 +5,13 @@ program PKCS7ExtractorTest;
 {***************************************************************************}
 {                                                                           }
 {     PKCS#7 Extractor for Delphi Unit Tests                                }
-{     Version 1.0.0.0 released November, 22nd 2018                          }
+{     Version 1.2.0.0 released March, 2nd 2020                              }
 {                                                                           }
 {     Copyright (C) 2018 Delphi Club Italia                                 }
 {                        http://www.delphiclubitalia.it                     }
 {                                                                           }
 {     Original authors:                                                     }
-{         Christian Cristofori         pkcs7reader@christiancristofori.it   }
+{         Christian Cristofori              github@christiancristofori.it   }
 {         Giancarlo Oneglio                   giancarlo.oneglio@gmail.com   }
 {                                                                           }
 {***************************************************************************}
@@ -83,12 +83,12 @@ begin
   if (not DirectoryExists(sFolder)) and (not ForceDirectories(sFolder)) then begin
     if Length(AFolder) > 0 then Exit;
     // If no folder was given, checks for the TEMP folder
-    sFolder := GetTempFolder();
+    sFolder := GetTempFolder;
     if (not DirectoryExists(sFolder)) and (not ForceDirectories(sFolder)) then Exit
   end;
   // Generates a random prefix
   FillChar(szPrefix, Length(szPrefix) * SizeOf(Char), 0);
-  Randomize();
+  Randomize;
   for I := 0 to 2 do
     szPrefix[I] := ALPHA[Random(Length(ALPHA)) + 1];
   S := APrefix;
@@ -170,13 +170,15 @@ begin
 end;
 
 const
-  VERIFICATION_OPTION_TO_STRING: Array[TVerificationOption] of String = ('voNone', 'voVerify', 'voSignature');
+  VERIFY_STATUS_TO_STRING: Array[TVerifyStatus] of String = ('vsUnknown', 'vsFull', 'vsPartial');
+  SIGNATURE_MODE_TO_STRING: Array[TSignatureMode] of String = ('smUnknown', 'smPKCS7', 'smCMS');
 var
   tempFile, tempFolder: String;
   msInput, msOutput: TMemoryStream;
   S: String;
   I: Integer;
-  V: TVerificationOption;
+  V: TVerifyStatus;
+  M: TSignatureMode;
 begin
   try
     paramList := FindCmdLineSwitch('list', ['/', '-'], True);
@@ -217,18 +219,18 @@ begin
       tempFolder := '';
     end;
     EmptyFolder(tempFolder);
-    slLibs := TStringList.Create();
-    slTests := TStringList.Create();
+    slLibs := TStringList.Create;
+    slTests := TStringList.Create;
     try
       Write('Searching for libraries... ');
-      paramVersions := TStringList.Create();
+      paramVersions := TStringList.Create;
       try
-        if (not paramList) and (ParamCount() > 0) then
-          for I := 1 to ParamCount() do
+        if (not paramList) and (ParamCount > 0) then
+          for I := 1 to ParamCount do
             paramVersions.Add(ParamStr(I));
         SearchLibrary(currentFolder + 'OpenSSL\' + ARCHITECTURE);
       finally
-        paramVersions.Free()
+        paramVersions.Free
       end;
       if slLibs.Count = 0 then begin
         WriteLn('no libraries found!');
@@ -240,12 +242,12 @@ begin
       if paramList then begin
         I := 0;
         while slLibs.Count > 0 do begin
-          PKCS7Extractor.Unload();
+          PKCS7Extractor.Unload;
           FreeLibrary(GetModuleHandle(LIBEAY32_LIBRARY));
           PKCS7Extractor.SetFolder(slLibs[0]);
-          if PKCS7Extractor.Loaded() then begin
+          if PKCS7Extractor.Loaded then begin
             Inc(I);
-            slTests.Add(PKCS7Extractor.GetVersion())
+            slTests.Add(PKCS7Extractor.GetVersion)
           end;
           slLibs.Delete(0)
         end;
@@ -260,7 +262,7 @@ begin
       end;
 
       Write('Searching for test data... ');
-      SearchTests();
+      SearchTests;
       if slTests.Count = 0 then begin
         WriteLn('no test data found!');
         WriteLn(Format('Unable to continue: please be sure to put at least one file into folder "%sData\" and the result file with the same filename in the "%sDataCheck\" folder.', [currentFolder, currentFolder]));
@@ -278,198 +280,216 @@ begin
         WriteLn(Format('  testing with file "%s"... %s', [slTests[I], S]))
       end;
 
-      msInput := TMemoryStream.Create();
-      msOutput := TMemoryStream.Create();
+      msInput := TMemoryStream.Create;
+      msOutput := TMemoryStream.Create;
       try
         while slLibs.Count > 0 do begin
 
           WriteLn;
           WriteLn(Format('Testing with library located at "%s".', [slLibs[0]]));
 
-          PKCS7Extractor.Unload();
+          PKCS7Extractor.Unload;
           FreeLibrary(GetModuleHandle(LIBEAY32_LIBRARY));
           PKCS7Extractor.SetFolder(slLibs[0]);
           slLibs.Delete(0);
-          Write('Testing PKCS7Extractor.Load()... ');
-          if PKCS7Extractor.Load() then
+          Write('Testing PKCS7Extractor.Load... ');
+          if PKCS7Extractor.Load then
             WriteLn('successfully loaded.')
           else
             WriteLn('NOT LOADED!');
 
-          WriteLn(Format('Testing PKCS7LibraryLocation: "%s"', [PKCS7Extractor.GetFolder()]));
-          WriteLn(Format('Testing PKCS7LibraryVersion: "%s"', [PKCS7Extractor.GetVersion()]));
+          WriteLn(Format('Testing PKCS7LibraryLocation: "%s"', [PKCS7Extractor.GetFolder]));
+          WriteLn(Format('Testing PKCS7LibraryVersion: "%s"', [PKCS7Extractor.GetVersion]));
 
-          for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-            WriteLn(Format('Testing PKCS7Extractor.Verify(Stream, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              msInput.Clear();
-              try
-                msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
-                msInput.Position := 0
-              except
-                WriteLn('unable to load input file.');
-                Continue
-              end;
-              if PKCS7Extractor.Verify(msInput, V) then
-                WriteLn('data corresponds to a valid PKCS#7 message file.')
-              else
-                WriteLn('not a valid PKCS#7 message file.')
+          WriteLn('Testing PKCS7Extractor.Verify(Stream)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            msInput.Clear;
+            try
+              msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
+              msInput.Position := 0
+            except
+              WriteLn('unable to load input file.');
+              Continue
             end;
-
-            WriteLn(Format('Testing PKCS7Extractor.Verify(Filename, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              if PKCS7Extractor.Verify(currentFolder + 'Data\' + slTests[I], V) then
-                WriteLn('data corresponds to a valid PKCS#7 message file.')
-              else
-                WriteLn('not a valid PKCS#7 message file.')
-            end;
+            V := PKCS7Extractor.Verify(msInput);
+            if V in [vsFull, vsPartial] then
+              WriteLn(Format('data corresponds to a valid PKCS#7 message file. (%s)', [VERIFY_STATUS_TO_STRING[V]]))
+            else
+              WriteLn('not a valid PKCS#7 message file.');
           end;
 
-          for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-            WriteLn(Format('Testing PKCS7Extractor.Extract(Stream, Stream, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              msInput.Clear();
-              try
-                msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
-                msInput.Position := 0
-              except
-                WriteLn('unable to load input file.');
-                Continue
-              end;
-
-              msOutput.Clear();
-              if PKCS7Extractor.Extract(msInput, msOutput, V) then begin
-                msInput.Clear();
-                try
-                  msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
-                except
-                  WriteLn('file has been extracted but can''t load check file for comparision.');
-                  Continue
-                end;
-                if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
-                  WriteLn('success.')
-                else
-                  WriteLn('extracted data does not correspond to check file content.')
-              end else
-                WriteLn('not a valid PKCS#7 message file.')
-            end;
+          WriteLn('Testing PKCS7Extractor.Verify(Filename)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            V := PKCS7Extractor.Verify(currentFolder + 'Data\' + slTests[I]);
+            if V in [vsFull, vsPartial] then
+              WriteLn(Format('data corresponds to a valid PKCS#7 message file. (%s)', [VERIFY_STATUS_TO_STRING[V]]))
+            else
+              WriteLn('not a valid PKCS#7 message file.');
           end;
 
-          for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-            WriteLn(Format('Testing PKCS7Extractor.Extract(Filename, Filename, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              if PKCS7Extractor.Extract(currentFolder + 'Data\' + slTests[I], tempFile, V) then begin
-                msInput.Clear();
-                try
-                  msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
-                except
-                  WriteLn('file has been extracted but can''t load check file for comparision.');
-                  Continue
-                end;
-                msOutput.Clear();
-                try
-                  msOutput.LoadFromFile(tempFile)
-                except
-                  WriteLn('file has been extracted but can''t load temporary output file for comparision.');
-                  Continue
-                end;
-                if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
-                  WriteLn('success.')
-                else
-                  WriteLn('extracted data does not correspond to check file content.')
-              end else
-                WriteLn('not a valid PKCS#7 message file.')
+          WriteLn('Testing PKCS7Extractor.SignatureMode(Stream)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            msInput.Clear;
+            try
+              msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
+              msInput.Position := 0
+            except
+              WriteLn('unable to load input file.');
+              Continue
             end;
+            M := PKCS7Extractor.SignatureMode(msInput);
+            if M in [smPKCS7, smCMS] then
+              WriteLn(Format('data corresponds to a valid PKCS#7 message file. (%s)', [SIGNATURE_MODE_TO_STRING[M]]))
+            else
+              WriteLn('not a valid PKCS#7 message file.');
+          end;
+
+          WriteLn('Testing PKCS7Extractor.SignatureMode(Filename)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            M := PKCS7Extractor.SignatureMode(currentFolder + 'Data\' + slTests[I]);
+            if M in [smPKCS7, smCMS] then
+              WriteLn(Format('data corresponds to a valid PKCS#7 message file. (%s)', [SIGNATURE_MODE_TO_STRING[M]]))
+            else
+              WriteLn('not a valid PKCS#7 message file.');
+          end;
+
+          WriteLn('Testing PKCS7Extractor.Extract(Stream, Stream)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            msInput.Clear;
+            try
+              msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
+              msInput.Position := 0
+            except
+              WriteLn('unable to load input file.');
+              Continue
+            end;
+
+            msOutput.Clear;
+            if PKCS7Extractor.Extract(msInput, msOutput) then begin
+              msInput.Clear;
+              try
+                msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
+              except
+                WriteLn('file has been extracted but can''t load check file for comparision.');
+                Continue
+              end;
+              if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
+                WriteLn('success.')
+              else
+                WriteLn('extracted data does not correspond to check file content.')
+            end else
+              WriteLn('not a valid PKCS#7 message file.')
+          end;
+
+          WriteLn('Testing PKCS7Extractor.Extract(Filename, Filename)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            if PKCS7Extractor.Extract(currentFolder + 'Data\' + slTests[I], tempFile) then begin
+              msInput.Clear;
+              try
+                msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
+              except
+                WriteLn('file has been extracted but can''t load check file for comparision.');
+                Continue
+              end;
+              msOutput.Clear;
+              try
+                msOutput.LoadFromFile(tempFile)
+              except
+                WriteLn('file has been extracted but can''t load temporary output file for comparision.');
+                Continue
+              end;
+              if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
+                WriteLn('success.')
+              else
+                WriteLn('extracted data does not correspond to check file content.')
+            end else
+              WriteLn('not a valid PKCS#7 message file.')
           end;
 
           if Length(tempFolder) > 0 then begin
-            for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-              WriteLn(Format('Testing PKCS7Extractor.Extract(Filename, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-              for I := 0 to slTests.Count - 1 do begin
-                EmptyFolder(tempFolder);
-                Write(Format('  testing with file "%s"... ', [slTests[I]]));
-                if CopyFile(PChar(currentFolder + 'Data\' + slTests[I]), PChar(tempFolder + slTests[I]), True) then begin
-                  try
-                    S := PKCS7Extractor.Extract(tempFolder + slTests[I], V);
-                    if Length(S) > 0 then begin
+            WriteLn('Testing PKCS7Extractor.Extract(Filename)...');
+            for I := 0 to slTests.Count - 1 do begin
+              EmptyFolder(tempFolder);
+              Write(Format('  testing with file "%s"... ', [slTests[I]]));
+              if CopyFile(PChar(currentFolder + 'Data\' + slTests[I]), PChar(tempFolder + slTests[I]), True) then begin
+                try
+                  S := PKCS7Extractor.Extract(tempFolder + slTests[I]);
+                  if Length(S) > 0 then begin
+                    try
+                      msInput.Clear;
                       try
-                        msInput.Clear();
-                        try
-                          msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
-                        except
-                          WriteLn('file has been extracted but can''t load check file for comparision.');
-                          Continue
-                        end;
-                        msOutput.Clear();
-                        try
-                          msOutput.LoadFromFile(S)
-                        except
-                          WriteLn('file has been extracted but can''t load temporary output file for comparision.');
-                          Continue
-                        end;
-                        if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
-                          WriteLn('success.')
-                        else
-                          WriteLn('extracted data does not correspond to check file content.')
-                      finally
-                        DeleteFile(S)
-                      end
-                    end else
-                      WriteLn('not a valid PKCS#7 message file or destination filename can''t be guessed.')
-                  finally
-                    DeleteFile(tempFolder + slTests[I])
-                  end
-                end else
-                  WriteLn('failed copying file itno temp folder.')
-              end;
+                        msInput.LoadFromFile(currentFolder + 'DataCheck\' + slTests[I])
+                      except
+                        WriteLn('file has been extracted but can''t load check file for comparision.');
+                        Continue
+                      end;
+                      msOutput.Clear;
+                      try
+                        msOutput.LoadFromFile(S)
+                      except
+                        WriteLn('file has been extracted but can''t load temporary output file for comparision.');
+                        Continue
+                      end;
+                      if (msInput.Size = msOutput.Size) and CompareMem(msInput.Memory, msOutput.Memory, msInput.Size) then
+                        WriteLn('success.')
+                      else
+                        WriteLn('extracted data does not correspond to check file content.')
+                    finally
+                      DeleteFile(S)
+                    end
+                  end else
+                    WriteLn('not a valid PKCS#7 message file or destination filename can''t be guessed.')
+                finally
+                  DeleteFile(tempFolder + slTests[I])
+                end
+              end else
+                WriteLn('failed copying file itno temp folder.')
             end;
             EmptyFolder(tempFolder)
           end;
 
-          for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-            WriteLn(Format('Testing PKCS7Extractor.Extract(Stream, var String, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              msInput.Clear();
-              try
-                msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
-                msInput.Position := 0
-              except
-                WriteLn('unable to load input file.');
-                Continue
-              end;
-              if PKCS7Extractor.Extract(msInput, S, V) then
-                WriteLn(Format('success (string length %d bytes).', [Length(S)]))
-              else
-                WriteLn('extracted data does not correspond to check file content.')
+          WriteLn('Testing PKCS7Extractor.Extract(Stream, var String)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            msInput.Clear;
+            try
+              msInput.LoadFromFile(currentFolder + 'Data\' + slTests[I]);
+              msInput.Position := 0
+            except
+              WriteLn('unable to load input file.');
+              Continue
             end;
+            if PKCS7Extractor.Extract(msInput, S) then
+              WriteLn(Format('success (string length %d characters).', [Length(S)]))
+            else
+              WriteLn('extracted data does not correspond to check file content.')
           end;
 
-          for V := Low(TVerificationOption) to High(TVerificationOption) do begin
-            WriteLn(Format('Testing PKCS7Extractor.PKCS7ExtractToString(String, var String, %s)...', [VERIFICATION_OPTION_TO_STRING[V]]));
-            for I := 0 to slTests.Count - 1 do begin
-              Write(Format('  testing with file "%s"... ', [slTests[I]]));
-              if PKCS7Extractor.ExtractToString(currentFolder + 'Data\' + slTests[I], S, V) then
-                WriteLn(Format('success (string length %d bytes).', [Length(S)]))
-              else
-                WriteLn('extracted data does not correspond to check file content.')
-            end;
-          end;
+          WriteLn('Testing PKCS7Extractor.PKCS7ExtractToString(String, var String)...');
+          for I := 0 to slTests.Count - 1 do begin
+            Write(Format('  testing with file "%s"... ', [slTests[I]]));
+            if PKCS7Extractor.ExtractToString(currentFolder + 'Data\' + slTests[I], S) then
+              WriteLn(Format('success (string length %d characters).', [Length(S)]))
+            else
+              WriteLn('extracted data does not correspond to check file content.')
+          end
 
         end
       finally
-        msInput.Free();
-        msOutput.Free()
+        msInput.Free;
+        msOutput.Free
       end
     finally
       if FileExists(tempFile) then
         DeleteFile(tempFile);
-      slLibs.Free();
-      slTests.Free();
+      slLibs.Free;
+      slTests.Free;
       EmptyFolder(tempFolder)
     end
   except

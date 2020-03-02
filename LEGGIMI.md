@@ -1,23 +1,24 @@
 [english version - versione inglese](README.md)
 
-![Libreria PKCS#7 Extractor per Delphi](Documentation/pkcs7extractory_logo.png)
-# Libreria PKCS#7 Extractor per Delphi
+![Libreria PKCS#7 Extractor per Delphi / Free Pascal / Lazarus](Documentation/pkcs7extractory_logo.png)
+# Libreria PKCS#7 Extractor per Delphi / Free Pascal / Lazarus
 
 Questo progetto è nato dalla necessità di estrarre semplicemente il contenuto dei file .P7M in alcune applicazioni Delphi.\
-Recentemente gli sviluppatori italiani stanno affrontando il nuovo sistema di Fatturazione Elettronica che diventerà obbligatorio per legge dal 1 gennaio 2019.\
+Dal 1 gennaio 2019 gli sviluppatori italiani hanno dovuto affrontare il nuovo sistema di Fatturazione Elettronica, divenuto obbligatorio per Legge.\
 Le Fatture Elettroniche sono esenzialmente rappresentante in file XML che vengono firmate digitalmente utilizzando la modalità CAdES-BEM.\
 Gli sviluppatori che gestiscono fatture devono quindi generare questi file XML ed essere in grado di rileggerli, ma quando si tratta di una fattura firmata digitalmente inglobata in un file .P7M molti di loro hanno trovato la soluzione poco ortodossa di rimuovere l'envelope trovando il tag di apertura e di chiusura XML all'interno del file e copiando quella parte.\
 Abbiamo pensato che questo non potesse essere il modo professionale di gestire questa operazione, quindi abbiamo iniziato a studiare e siamo finiti a creare questo progetto.
 
 ## Indice
 
-  - [Libreria PKCS#7 Extractor per Delphi](#libreria-pkcs7-extractor-per-delphi)
+  - [Libreria PKCS#7 Extractor per Delphi / Free Pascal / Lazarus](#libreria-pkcs7-extractor-per-delphi-free-pascal-lazarus)
   - [Indice](#indice)
   - [File inclusi](#file-inclusi)
      - [PKCS7Extractor.pas](#pkcs7extractorpas)
        - [Che cosa è e come funziona](#che-cosa-e-e-come-funziona)
        - [Funzioni esportate](#funzioni-esportate)
        - [Classi esportate](#classi-esportate)
+         - [Evento OnStreamCreate](#evento-onstreamcreate)
   - [Applicazione demo](#applicazione-demo)
   - [Unit tests](#unit-tests)
     - [Salvare un report dei test](#salvare-un-report-dei-test)
@@ -37,7 +38,7 @@ Abbiamo pensato che questo non potesse essere il modo professionale di gestire q
 Questa è la unit principale con cui gli sviluppatori dovranno confrontarsi, esporta alcune utili funzioni per gestire i messaggi PKCS#7.
 
 ### Funzioni esportate
-Ogni funzione esportata ha una sua storia così lunga che a raccontarla nessuno ci crederebbe. Siamo chiari, non è stato per nulla facile, ma da ora dovrebbe esserlo. Iniziamo con il descrivere le funzioni esportate per il wrapper delle funzioni di [OpenSSL](https://www.openssl.org/).
+Ogni funzione esportata ha una sua storia così lunga che a raccontarla nessuno ci crederebbe. Siamo chiari, non è stato per nulla facile, ma da ora dovrebbe esserlo. Iniziamo con il descrivere le funzioni esportate per il wrapper delle funzioni di [OpenSSL](https://www.openssl.org).
 
 ```delphi
 function Load: Boolean;
@@ -73,24 +74,49 @@ Questo potrebbe differire dalla cartella specificata utilizzando `SetFolder` qua
 function GetVersion: String;
 ```
 La funzione `GetVersion` ritorna semplicemente la stringa contenente la versione della libreria attualmente caricata in memoria o una stringa vuota qualora il wrapper non sia inizializzato.\
-La funzione corrispondente è stata introdotta in [OpenSSL](https://www.openssl.org/) dalla versione 0.9.7, qyuindi questa funzione ritornerà una stringa vuota con versioni precedenti.\
-\
-Prima di continuare, è necessario prendere visione delle opzioni di verifica. Ogni funzione che estrae o verifica i dati nel messaggio PKCS#7 richiede questo parametro. Qualora non venga specificato sarà presupposto il valore `voNone`.
+La funzione corrispondente è stata introdotta in [OpenSSL](https://www.openssl.org) dalla versione 0.9.7, qyuindi questa funzione ritornerà una stringa vuota con versioni precedenti.
 
 ```delphi
-  TVerificationOption = (voNone, voVerify, voSignature);
+function GetErrorCode: Cardinal;
+```
+Ritorna un codice numerico che rappresenta l'ultimo errore interno della libreria OpenSSL.
+
+```delphi
+function GetError(const ErrorCode: Cardinal): String;
+```
+Ritorna la descrizione testuale per un dato codice di errore.
+
+```delphi
+function GetError: String;
+```
+Ritorna la descrizione testuale per l'ultimo errore interno della libreria OpenSSL.\
+\
+Prima di continuare, è necessario prendere visione di due tipi indispensabili.
+
+```delphi
+  TVerifyStatus = (vsUnknown, vsFull, vsPartial);
 ```
 
-|Type|Description|
+|Valore|Descrizione|
 |--|--|
-|`voNone`|Fa semplicemente un controllo di checksum ed una verifica formale sul contenuto.|
-|`voVerify`|Verifica i dati del messaggio e la struttura dell'envelope.|
-|`voSignature`|Esegue una verifica completa dei dati del messaggio, dell'envelope e delle firme.|
+|`vsUnknown`|Nessun dato è stato caricato o i dati non erano validi.|
+|`vsPartial`|I dati e la struttura dell'envelope sono stati verificati.|
+|`vsFull`|E' stata eseguita una verifica completa dei dati.|
+
+```delphi
+  TSignatureMode = (smUnknown, smPKCS7, smCMS);
+```
+
+|Valore|Descrizione|
+|--|--|
+|`smUnknown`|Nessun dato è stato caricato o i dati non erano validi.|
+|`smPKCS7`|I dati sono stati caricati ed erano imbustati con funzioni PKCS#7.|
+|`smCMS`|I dati sono stati caricati ed erano imbustati con funzioni CMS.|
 
 Quelle che seguono sono le funzioni di utilità.
 
 ```delphi
-function Extract(InStream, OutStream: TStream; Verify: TVerificationOption): Boolean;
+function Extract(InStream, OutStream: TStream): Boolean;
 ```
 Dato un messaggio PKCS#7 presente in uno stream, ritorna il contenuto estratto ad un altro stream.\
 Ritorna se l'operazione è andata a buon fine o meno.\
@@ -98,12 +124,12 @@ Si prega di notare che `InStream.Position` deve essere impostata al punto di ini
 I dati risultati - se ve ne sono - sono aggiunti in coda al contenuto corrente dello stream di output, è quindi necessario fornire uno stream vuoto prima di richiamare questa funzione per ottenere solamente il contenuto del messaggio estratto.
 
 ```delphi
-function Extract(InFilename, OutFilename: String; Verify: TVerificationOption): Boolean;
+function Extract(InFilename, OutFilename: String): Boolean;
 ```
 Funzione parallela che estrae i dati da un file PKCS#7 specificato con nome file ad un altro file. Ritorna se l'operazione è avvenuta correttamente o meno.
 
 ```delphi
-function Extract(Filename: String; Verify: TVerificationOption): Boolean;
+function Extract(Filename: String): Boolean;
 ```
 Estrae il contenuto di un file contenente un messaggio PKCS#7 usando come file di output un nome di file calcolato automaticamente. Ritorna se l'operazione è avvenuta correttamente o meno. Si tenga conto che se il nome di file di destinazione non può essere calcolato, l'operazione fallirà.\
 Per vedere come il file viene calcolato si legga della funzione `GuessFilename` qui sotto.
@@ -115,25 +141,37 @@ Prova a calcolare il nome di file di destinazione di un dato file originale, il 
 Per verificare che l'estensione sia stata aggiunta invece che sostituita, se nel file risultante non dovesse esserci un'altra estensione, la funzione fallità e ritornerà il nome del file originale.
 
 ```delphi
-function Verify(Stream: TStream; Verify: TVerificationOption): Boolean;
+function Verify(Stream: TStream): TVerifyStatus;
 ```
 Funzione necessaria a verificare se un dato stream contiene o meno un messaggio PKCS#7 valido. Come per `Extract(TStream, TStream)` ci si ricordi che la proprietà `Position` dello stream di input deve essere impostato all'inizio del messaggio PKCS#7 prima di essere passato a questa funzione.\
 A differenza di `Extract(TStream, TStream)` comunque, questa funzione manterrà il valore della proprietà `Position` al suo valore corrente.
 
 ```delphi
-function Verify(Filename: String; Verify: TVerificationOption): Boolean;
+function Verify(Filename: String): TVerifyStatus;
 ```
 Verifica semplicemente che un dato file contenga un messaggio PKCS#7 valido.
 
 ```delphi
-function Extract(Stream: TStream; var S: String; Verify: TVerificationOption): Boolean;
+function Extract(Stream: TStream; var S: String): Boolean;
 ```
 Funzione per ottenere il contenuto di un messaggio PKCS#7 estratto da uno stream direttamente in una stringa. Se l'operazione fallisse il valore tornato sarebbe `False` e sarà tornata uns stringa vuota.
 
 ```delphi
-function ExtractToString(Filename: String; var S: String; Verify: TVerificationOption): Boolean;
+function ExtractToString(Filename: String; var S: String): Boolean;
 ```
 Funzione per ottenere il contenuto di un messaggio PKCS#7 estratto da un file direttamente in una stringa. Se l'operazione fallisse il valore tornato sarebbe `False` e sarà tornata uns stringa vuota.
+
+```delphi
+function SignatureMode(Stream: TStream): TSignatureMode; overload;
+```
+
+Ritorna il tipo di funzioni crittografiche utilizzate per imbustare dei dati. Preserva il valore della proprietà `Position` dello stream.
+
+```delphi
+function SignatureMode(const Filename: String): TSignatureMode; overload;
+```
+
+Ritorna il tipo di funzioni crittografiche utilizzate per imbustare un file.
 
 ### Classi esportate
 
@@ -164,12 +202,6 @@ function TPKCS7Message.LoadFromFile(Filename: String): Boolean;
 Carica un messaggio PKCS#7 da un file, ritorna `True` al successo.
 
 ```delphi
-function TPKCS7Message.Verify(Verify: TVerificationOption): Boolean;
-```
-
-Verifica i dati precedentemente caricati con `LoadFromStream` o `LoadFromFile`, ritorna `True` se i dati sono validi. Se non specificato, il parametro `Verify` equivale a `voNone`.
-
-```delphi
 function TPKCS7Message.SaveToStream(Stream: TStream): Boolean;
 ```
 
@@ -181,10 +213,68 @@ function TPKCS7Message.SaveToFile(Filename: String): Boolean;
 
 Salva il contenuto precedenemtente caricato con `LoadFromStream` o `LoadFromFile` su un file, ritorna `True` al successo.
 
+```delphi
+property SignatureMode: TSignatureMode;
+```
+
+Proprietà in sola lettura che rappresenta il tipo di funzioni crittografiche utilizzate per imbustare i dati.
+
+```delphi
+property VerifyStatus: TVerifyStatus;
+```
+
+Proprietà in sola lettura che rappresenta il tipo di verifica che è stata effettuata sui dati.
+
+#### Evento OnStreamCreate
+
+La classe estrae tutto il contenuto dai dati e li memorizza durante l'uso delle funzioni `LoadFromStream` o `LoadFromFile`.
+Si è scelto di memorizzare i dati in memoria RAM utilizzando un `TMemoryStream`, visto che i dati per cui era inizialmente destinata questa classe dovevano essere di dimensioni ridotte.
+Tuttavia è possibile che ci sia la necessità di reindirizzare i dati estratti altrove, per questo motivo è stato definito un evento, scatenato nel momento in cui la classe ha bisogno di allocare lo spazio dove memorizzare i dati.
+In questo modo è possibile redirigere i dati a qualsiasi discendente di `TStream` che sia scrivibile.
+
+```delphi
+property OnStreamCreate: TStreamCreateEvent;
+```
+
+Per esempio potremo definire nella nostra Form un evento con cui andare a creare un file temporaneo.
+
+```delphi
+type
+  TMyForm = class(TForm)
+    ...
+    procedure FormCreate(Sender: TObject);
+  private
+    FPKCS7Message: TPKCS7Message;
+  protected
+    procedure PKCS7Stream(Sender: TObject; var AStream: TStream);
+    ...
+
+...
+procedure TMyForm.PKCS7Stream(Sender: TObject; var AStream: TStream);
+begin
+  AStream := TFileStream.Create('temp.tmp', fmCreate or fmOpenReadWrite or fmShareDenyWrite)
+end;
+
+...
+
+procedure TMyForm.FormCreate(Sender: TObject);
+begin
+  FPKCS7Message := TPKCS7Message.Create;
+  FPKCS7Message.OnStreamCreate := PKCS7Stream;
+...
+end;
+...
+```
+
+La classe si occuperà di richiamare il `Free` dello stream creato quando questo non sarà più necessario.
+
+ADDENDUM: nella cartella "Utils" potete trovare il file [CCLib.TempFileStream.pas](Utils/CCLib.TempFileStream.pas) che non fa parte di questa libreria ma è liberamente disponibile.
+Esporta una semplice classe discendente da `TStream` che crea un file temporaneo con nome casuale nella cartella temporanea di sistema, impedendone l'accesso ad altre applicazioni.
+Questo file sarà eliminato automaticamente quando verrà richiamato il metodo `Free` della classe.
 
 ## Applicazione demo
 
-L'applicazione demo contenuto nella cartella `\Demo` è un semplice estrattore che permette inoltre di cambiare la cartella da cui le librerie [OpenSSL](https://www.openssl.org/) vengono caricate e selezionare un file, estrarlo verso un file di destinazione e visualizzare il suo contenuto in un controllo `TMemo`.
+L'applicazione demo contenuto nella cartella `\Demo` è un semplice estrattore che permette inoltre di cambiare la cartella da cui le librerie [OpenSSL](https://www.openssl.org) vengono caricate e selezionare un file, estrarlo verso un file di destinazione e visualizzare il suo contenuto in un controllo `TMemo`.
 
 ![Schermata della applicazione demo](Documentation/pkcs7extractory_demo.png)
 
@@ -198,7 +288,7 @@ Il software richiede l'esistenza di alcune cartelle e file all'interno della ste
 |--|--|--|
 | Data | SI | Questa cartella deve contenere una serie di file sui quali i test saranno eseguiti. |
 | DataCheck  | SI | In questa cartella devono essere contenuti dei file con i risultati attesi dall'estrazione dei file nella cartella "Data". Ogni file deve avere esattamente lo stesso nome file ed estensione del file sorgente. **I test verranno eseguiti solamente sui file che hanno corrispondenza nelle due cartelle.**
-| OpenSSL\x32  | NO* | Questa cartella deve contenere delle sottocartelle ognuna delle quali deve contenere le librerie di [OpenSSL](https://www.openssl.org/) in forma binaria. I test verranno eseguiti per ogni cartella trovata. **Inserire qui solamente librerie compilate a 32-bit** |
+| OpenSSL\x32  | NO* | Questa cartella deve contenere delle sottocartelle ognuna delle quali deve contenere le librerie di [OpenSSL](https://www.openssl.org) in forma binaria. I test verranno eseguiti per ogni cartella trovata. **Inserire qui solamente librerie compilate a 32-bit** |
 | OpenSSL\x64  | NO* | Stessa cosa di cui sopra, ma per le librerie 64-bit. |
 | Temp  | NO** | Questa cartella è utilizzata mentre i test vengono eseguiti per salvare alcuni file. **Non inserire alcun file in questa cartella**, questa cartella verrà eliminata ogni volta che vengono eseguiti i test. |
 
@@ -214,7 +304,7 @@ Per salvare un report dei test su un file di testo per una migliore analisi - o 
      PKCS7ExtractorTest.exe >report.txt
 Genererà un file chiamato "report.txt" contenente tutte le informazioni necessarie.
 ### Ottenere una lista delle librerie OpenSSL
-Per ottenere una lista delle librerie [OpenSSL](https://www.openssl.org/) presenti nelle cartelle `.\OpenSSL\x32` e/o `.\OpenSSL\x64` è possibile eseguire il programma di testo come:
+Per ottenere una lista delle librerie [OpenSSL](https://www.openssl.org) presenti nelle cartelle `.\OpenSSL\x32` e/o `.\OpenSSL\x64` è possibile eseguire il programma di testo come:
 
      PKCS7ExtractorTest.exe /list
 
@@ -224,7 +314,7 @@ Questo causerà l'output delle sole versioni delle librerie che il programma è 
 Questo genererà un file chiamato "output.txt".
 
 ### Eseguire i test solo su alcune versioni di OpenSSL
-Avendo una lunga lista di versioni diverse di [OpenSSL](https://www.openssl.org/) nella cartella `.\OpenSSL` perdavamo molto tempo eseguendo i test, per questa ragione abbiamo implementato la possibilità di specificare quali versioni eseguire.\
+Avendo una lunga lista di versioni diverse di [OpenSSL](https://www.openssl.org) nella cartella `.\OpenSSL` perdavamo molto tempo eseguendo i test, per questa ragione abbiamo implementato la possibilità di specificare quali versioni eseguire.\
 E' sufficiente eseguire l'eseguibile specificando i nomi delle sottocartelle da cui caricare, ad esempio:
 
      PKCS7ExtractorTest.exe 0.9.6 openssl-0.9.8x-i386-win32 "openssl ultima"
@@ -234,7 +324,7 @@ Eseguirà i test solamente con le librerie presenti nella cartelle chiamate "0.9
 
 Il progetto richiede le librerie [GNU Win32/64](http://gnuwin32.sourceforge.net/packages/openssl.htm) binarie per Windows.\
 La versione minima supportata dovrebbe essere la 0.9.6 rilasciata il 24 settembre 2000. Non siamo in grado di testare librerie precedenti a tale versione.\
-Con la versione 1.1.0 le librerie [OpenSSL](https://www.openssl.org/) hanno avuto una riscrittura importante e stiamo attualmente lavorando per capire come rendere questa librerie compatibile con queste versioni.
+Con la versione 1.1.0 le librerie [OpenSSL](https://www.openssl.org) hanno avuto una riscrittura importante e stiamo attualmente lavorando per capire come rendere questa librerie compatibile con entrambe le versioni. Non garantiamo che questa libreria sarà in futuro compatibile con tali versioni.
 
 Questa unit è stata testata con le seguenti versioni binarie:
 
@@ -276,7 +366,6 @@ Questa unit è stata testata con le seguenti versioni binarie:
 | 0.9.8k | 25 Mar 2009 | :white_check_mark: | :white_check_mark: |  |
 | 0.9.8l | 5 Nov 2009 | :white_check_mark: | :white_check_mark: |  |
 | 0.9.8l | 5 Nov 2009 | :white_check_mark: | *N/A* | Indy Backport |
-| 0.9.8m-beta1 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 0.9.8m | 25 Feb 2010 | :white_check_mark: | :white_check_mark: |  |
 | 0.9.8n | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 0.9.8o | 01 Jun 2010 | :white_check_mark: | :white_check_mark: |  |
@@ -299,11 +388,6 @@ Questa unit è stata testata con le seguenti versioni binarie:
 | 0.9.8zf | 19 Mar 2015 | :white_check_mark: | :white_check_mark: |  |
 | 0.9.8zg | 11 Jun 2015 | :white_check_mark: | :white_check_mark: |  |
 | 0.9.8zh | 3 Dec 2015 | :white_check_mark: | :white_check_mark: |  |
-| 1.0.0-beta1 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.0-beta2 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.0-beta3 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.0-beta4 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.0-beta5 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 1.0.0 | 29 Mar 2010 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.0a | 1 Jun 2010 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.0b | ??? | ??? | ??? | searching fo this |
@@ -326,9 +410,6 @@ Questa unit è stata testata con le seguenti versioni binarie:
 | 1.0.0r | 19 Mar 2015 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.0s | 11 Jun 2015 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.0t | 3 Dec 2015 | :white_check_mark: | :white_check_mark: |  |
-| 1.0.1-beta1 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.1-beta2 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.1-beta3 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 1.0.1 | 14 Mar 2012 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.1a | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 1.0.1b | 26 Apr 2012 | :white_check_mark: | :white_check_mark: |  |
@@ -350,9 +431,6 @@ Questa unit è stata testata con le seguenti versioni binarie:
 | 1.0.1s | 1 Mar 2016 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.1t | 3 May 2016 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.1u | 22 Sep 2016 | :white_check_mark: | :white_check_mark: |  |
-| 1.0.2-beta1 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.2-beta2 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.0.2-beta3 | ??? | ??? | ??? | siamo alla ricerca di questa versione |
 | 1.0.2 | 22 Jan 2015 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.2a | 19 Mar 2015 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.2b | ??? | ??? | ??? | siamo alla ricerca di questa versione |
@@ -369,45 +447,50 @@ Questa unit è stata testata con le seguenti versioni binarie:
 | 1.0.2m | 2 Nov 2017 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.2n | 7 Dec 2017 | :white_check_mark: | :white_check_mark: |  |
 | 1.0.2o | 27 Mar 2018 | :white_check_mark: | :white_check_mark: |  |
-| 1.0.2p | ??? | ??? | ??? | siamo alla ricerca di questa versione |
-| 1.1.0-pre1 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0-pre2 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0-pre3 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0a | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0b | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0c | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0d | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0e | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0f | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0g | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0h | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.0i | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre1 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre2 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre3 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre4 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre5 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre6 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre7 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre8 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1-pre9 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
-| 1.1.1 | ??? | ??? | ??? | **STIAMO ATTUALMENTE LAVORANDO A QUESTA INTEGRAZIONE** |
+| 1.0.2p | 14 Aug 2018 | :white_check_mark: | :white_check_mark: |  |
+| 1.0.2q | 20 Nov 2018 | :white_check_mark: | :white_check_mark: |  |
+| 1.0.2r | 26 Feb 2019 | :white_check_mark: | :white_check_mark: |  |
+| 1.0.2s | 28 May 2019 | :white_check_mark: | :white_check_mark: |  |
+| 1.0.2t | 10 Sep 2019 | :white_check_mark: | :white_check_mark: |  |
+| 1.0.2u | 20 Dec 2019 | :white_check_mark: | :white_check_mark: |  |
 
-La maggior parte di queste versioni binarie è stata trovata su [indy.fulgan.com](https://indy.fulgan.com/SSL/Archive/).\
+La maggior parte di queste versioni binarie è stata trovata su [indy.fulgan.com](https://indy.fulgan.com/SSL/Archive).\
 Siamo attualmente alla ricerca delle versioni binarie che ci mancano quindi fateci sapere qualora doveste trovarne qualcosa, saremo ben lieti di aggiungerle ai nostri test.\
 Ogni informazioni riguardante problemi di compatibilità sarà benvenuto.
+Si è deciso di ignorare le versioni 1.1.0+ da questa tabella, così come le versioni beta che non sono adatte alla distribuzione.
 
 ## Cronologia versioni
+
+- Versione 1.2.0.0 rilasciata il 2 marzo 2020
+  - aggiunta la gestione dei file firmati utilizzando le funzioni di crittografia CMS (richiede librerie OpenSSL 0.9.8h o successive)
+  - ora compatibile con Lazarus / Free Pascal
+  - il sorgente non è compatibile con compilatori precedenti a Delphi 6
+  - tutta l'elaborazione è stata sposta in LoadFromStream, utilizza meno variabili di classe
+  - TPKCS7Message.Verify è stata sostituita dalla proprietà TPKCS7Message.VerifyStatus
+  - nuova proprietà TPKCS7Message.SignatureMode
+  - nuove funzioni veloci SignatureMode(Stream) and SignatureMode(String)
+  - nuovo evento TPKCS7Message.OnStreamCreate che consente di modificare la classe TStream da utilizzare
+  - Extract(Stream, S) e ExtractToString ora gestiscono i BOM e le codifiche (Delphi 2009+)
+  - aggiunte le funzioni GetErrorCode, GetError(Cardinal) e GetError
+  - non è più necessario specificare le opzioni di verifica
+  - non lascia un file vuoto quando si crea un nuovo file con SaveToFile e fallisce
+  - spostate tutte le noiose definizioni delle strutture nell'implementation
+  - evitato hint del compilatore Delphi (ne persistono alcuni molto sciocchi su Free Pascal / Lazarus)
+  - aggiunto il file [CCLib.TempFileStream.pas](Utils/CCLib.TempFileStream.pas)
+  - testato con le librerie OpenSSL versioni 1.0.2q, 1.0.2r, 1.0.2s, 1.0.2t e 1.0.2u 
+  - risolti bug minori e riscritto parte di codice, rimosso lo zucchero sintattico
+  - aggiunto file batch per la creazione automatica dei risultati attesi dei test
+  - aggiornati README.md, LEGGIMI.md e lo screenshot della demo
+  - ripristinato file dell'icona DCI nella cartella della demo
 
 - Versione 1.0.0.0 rilasciata il 27 novembre 2018
   - primo rilascio pubblico
   - correzione di errori minori
   - pulizia del codice ed aggiunta commenti
-  - provato con alcune versioni in pià di OpenSSL
+  - provato con alcune versioni in più di OpenSSL
 
 - Versione 0.9.5.0 - 26 novembre 2018
- - correzione errori
+  - correzione errori
 
 - Versione 0.9.3.0 - 25 novembre 2018
   - la verifica supporta ora la verifica della firma
@@ -430,10 +513,10 @@ Ogni informazioni riguardante problemi di compatibilità sarà benvenuto.
   - rimossa la funzione `Loaded` da `Libeay32Wrapper`, utilizzare `Load`
   - riscritta completamente la funzione `Load` in `Libeay32Wrapper`
   - aggiunta funzione `GetLibraryFolder` per avere la posizione della libreria caricata
-  - `SSLeay_version` non è più una semplice replica della funzione omonima esportata da [OpenSSL](https://www.openssl.org/) ma una funzione più utile che ritorna una stringa contenente la versione
+  - `SSLeay_version` non è più una semplice replica della funzione omonima esportata da [OpenSSL](https://www.openssl.org) ma una funzione più utile che ritorna una stringa contenente la versione
 
 - Versione 0.5.0.0 - 23 novembre 2018
-  - abbandonata la dipendenza dal progetto [Indy](https://www.indyproject.org/), utilizza ora un proprio wrapper minimale
+  - abbandonata la dipendenza dal progetto [Indy](https://www.indyproject.org), utilizza ora un proprio wrapper minimale
   - rimossa la funzione `PKCS7Check` da `PKCS7Extractor.pas` utilizzare le funzioni `Libeay32Wrapper.Load` e `.Loaded`
   - aggiunto il file `Libeay32Wrapper.pas`
 
@@ -457,46 +540,69 @@ Ogni informazioni riguardante problemi di compatibilità sarà benvenuto.
 
 ## Compatibilità con i compilatori
 
-Vorremmo essere in grado di raggiungere la piena compatiblità con ogni compilatore Delphi (magari anche con [Free Pascal](https://www.freepascal.org/)), ma abbiamo bisogno che altri ci aiutino a testare il codice con compilatori di cui non abbiamo la licenza. Per ogni compilatore non indicato come compatibile stiamo aspettando che qualcuno si metta in contatto con noi per inviarci i test compilati con quel compilatore.
+Vorremmo essere in grado di raggiungere la piena compatiblità con ogni compilatore Delphi (magari anche con [Free Pascal](https://www.freepascal.org)), ma abbiamo bisogno che altri ci aiutino a testare il codice con compilatori di cui non abbiamo la licenza. Per ogni compilatore non indicato come compatibile stiamo aspettando che qualcuno si metta in contatto con noi per inviarci i test compilati con quel compilatore.
 
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 2\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 3\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 4\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 5\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 6\
-:white_check_mark: [Borland](https://www.embarcadero.com/) Delphi 7\
-:thought_balloon: [Borland](https://www.embarcadero.com/) DevelopDelphier Studio 2005\
-:thought_balloon: [Borland](https://www.embarcadero.com/) Delphi 2006\
-:thought_balloon: Turbo Delphi 2006\
-:white_check_mark: [CodeGear](https://www.embarcadero.com/) Delphi 2007\
-:white_check_mark: [Embarcadero](https://www.embarcadero.com/) Delphi 2009\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 2010\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE2 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE3 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE4 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE5 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE6 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE7 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi XE8 (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10 Seattle (32 and 64 bit)\
-:white_check_mark: [Embarcadero](https://www.embarcadero.com/) Delphi 10.1 Berlin (32 and 64 bit)\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10.2 Tokyo (32 and 64 bit) *on it's way, will arrive soon...*\
-:thought_balloon: [Embarcadero](https://www.embarcadero.com/) Delphi 10.3 Rio (32 and 64 bit) *on it's way, will arrive soon...*
+|     | Compilatore | S.O. | Architettura | Versione | Tester/Note |
+|:---:|-------------|:----:|:------------:|---------:|-------------|
+| :x: | [Borland](https://www.embarcadero.com) Delphi 1 | :mount_fuji: | *N/A* |  | No 32-bit support. |
+| :x: | [Borland](https://www.embarcadero.com) Delphi 2 | :mount_fuji: | x86 | 1.2.0.0 | Christian Cristofori |
+| :x: | [Borland](https://www.embarcadero.com) Delphi 3 | :mount_fuji: | x86 | 1.2.0.0 | Non *dovrebbe* funzionare. |
+| :x: | [Borland](https://www.embarcadero.com) Delphi 4 | :mount_fuji: | x86 | 1.2.0.0 | Non *dovrebbe* funzionare. |
+| :x: | [Borland](https://www.embarcadero.com) Delphi 5 | :mount_fuji: | x86 | 1.2.0.0 | Non *dovrebbe* funzionare. |
+| :white_check_mark: | [Borland](https://www.embarcadero.com) Delphi 6 | :mount_fuji: | x86 |  |  |
+| :white_check_mark: | [Borland](https://www.embarcadero.com) Delphi 7 | :mount_fuji: | x86 | 1.2.0.0 | Marcello Gribaudo |
+| :thought_balloon: | [Borland](https://www.embarcadero.com) Delphi 2005 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: | [Borland](https://www.embarcadero.com) Delphi 2006 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: | Turbo Delphi 2006 | :mount_fuji: | x86 |  |  |
+| :white_check_mark: | [CodeGear](https://www.embarcadero.com) Delphi 2007 | :mount_fuji: | x86 | 1.2.0.0 | Christian Cristofori |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi 2009 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi 2010 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE | :mount_fuji: | x86 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE2 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE3 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE4 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE5 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE6 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :white_check_mark: | [Embarcadero](https://www.embarcadero.com) Delphi XE7 | :mount_fuji: | x86 | 1.2.0.0 | Diego Rigoni |
+| :white_check_mark: |  | :mount_fuji: | x64 | 1.0.0.0 | Diego Rigoni |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi XE8 | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :thought_balloon: | [Embarcadero](https://www.embarcadero.com) Delphi 10 Seattle | :mount_fuji: | x86 |  |  |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :white_check_mark: | [Embarcadero](https://www.embarcadero.com) Delphi 10.1 Berlin | :mount_fuji: | x86 | 1.2.0.0 | Gianni Giorgetti |
+| :white_check_mark: |  | :mount_fuji: | x64 | 1.0.0.0 | Christian Cristofori |
+| :white_check_mark: | [Embarcadero](https://www.embarcadero.com) Delphi 10.2 Tokyo | :mount_fuji: | x86 | 1.0.0.0 | Christian Cristofori |
+| :white_check_mark: |  | :mount_fuji: | x64 | 1.0.0.0 | Christian Cristofori |
+| :white_check_mark: | [Embarcadero](https://www.embarcadero.com) Delphi 10.3 Rio | :mount_fuji: | x86 | 1.2.0.0 | Christian Cristofori |
+| :white_check_mark: |  | :mount_fuji: | x64 | 1.2.0.0 | Christian Cristofori |
+| :white_check_mark: | [Lazarus](https://www.lazarus-ide.org) 2.0.6 [Free Pascal](https://freepascal.org) 3.0.4 | :mount_fuji: | x86 | 1.2.0.0 | Christian Cristofori |
+| :thought_balloon: |  | :mount_fuji: | x64 |  |  |
+| :x: |  | :penguin: | x86 | \*1.1.0.0 | Christian Cristofori |
+| :thought_balloon: |  | :penguin: | x64 |  |  |
+
+\*: la versione 1.1.0.0 non è mai stata più che una banale versione alpha.
 
 ## Progetti per il futuro
 
 - Gestione della firma per verificarne la validità.
-- Ottenere i risultati dei test in tutte le versioni di Delphi, gestire una rete di volontari in grado di fornire nuovi test per ogni nuova release.
+- Gestione dello store dei certificati per selezionare quali CA considerare autoritative.
 - Rendere questa unit compatibile con ogni versione di Delphi.
-- Rendere questo compatibile anche con [Free Pascal](https://www.freepascal.org/).
-- Compatibilità con ogni possibile versione di [OpenSSL](https://www.openssl.org/).
+- Ottenere i risultati dei test in tutte le versioni di Delphi, gestire una rete di volontari in grado di fornire nuovi test per ogni nuova release.
+- Compatibilità con ogni possibile versione di [OpenSSL](https://www.openssl.org).
 
 ## Ringraziamenti
 
-- [Delphi Club Italia](http://www.delphiclubitalia.it/) - [Pagina Facebook](https://www.facebook.com/groups/delphiclubitalia)
+- [Delphi Club Italia](http://www.delphiclubitalia.it) - [Pagina Facebook](https://www.facebook.com/groups/delphiclubitalia)
 - [Christian Cristofori](https://github.com/zizzo81)
-- [Giancarlo Oneglio](http://www.onix.it/)
+- [Giancarlo Oneglio](http://www.onix.it)
+- [Diego Rigoni](mailto:diego@gdpitalia.com)
+- [Gianni Giorgetti](https://www.g3cube.net)
+- [Marcello Gribaudo](mailto:marcello.gribaudo@opigi.com)
 
 ## Commenti
 Qualsiasi suggerimento, contributo o commento sarà veramente apprezzato.
