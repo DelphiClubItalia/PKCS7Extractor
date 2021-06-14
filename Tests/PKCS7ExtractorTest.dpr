@@ -5,7 +5,7 @@ program PKCS7ExtractorTest;
 {***************************************************************************}
 {                                                                           }
 {     PKCS#7 Extractor for Delphi Unit Tests                                }
-{     Version 1.2.0.0 released March, 2nd 2020                              }
+{     Version 1.3.0.0 released June, 15th 2021                              }
 {                                                                           }
 {     Copyright (C) 2018 Delphi Club Italia                                 }
 {                        http://www.delphiclubitalia.it                     }
