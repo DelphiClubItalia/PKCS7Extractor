@@ -25,10 +25,12 @@ We thought this couldn't be the professional way of managing this task, so we st
     - [Get a list of the OpenSSL libraries](#get-a-list-of-the-openssl-libraries)
     - [Run test only on certain versions of OpenSSL](#run-test-only-on-certain-versions-of-openssl)
   - [Required files](#required-files)
+  - [Notes about Base64-encoded files](#notes-about-base64-encoded-files)
   - [Version history](#version-history)
   - [Compiler compatibility](#compiler-compatibility)
   - [Projects for the future](#projects-for-the-future)
   - [Thanks](#thanks)
+  - [Projects using this library](#projects-using-this-library)
   - [Comments](#comments)
 
 ## Included files
@@ -463,7 +465,48 @@ We're currently looking for binaries not listed here so please let us know if th
 Every compatibility issues reported will be appreciated.
 We decided to remove versions 1.1.0+ in this table, as well as beta versions which are not suitable for distribution.
 
+## Notes about Base64-encoded files
+
+**This library does not manage Base64-encoded files, read this chapter to discover how to enable management.**
+
+Since this library has been made available, we got in touch with people using it found files that they stated where not correctly managed, telling us that files appeared corrupted or "strange".
+After analysing all that files we discovered those where simply encoded using the [Base64 algorithm](https://datatracker.ietf.org/doc/html/rfc4648). Since there's a great availability of libraries, components and simple units that manage that encoding, we just addressed people that way.\
+This way of managing the problem has been decided based on the results of a public poll on [Delphi Club Italia](http://www.delphiclubitalia.it) from which emerged that this functionality should not be part of this library because it doesn't belong to the process. Many pointed that most developers had already solved this problem with one of the implementations of the Base64 decoder available.\
+\
+However, recent developments have pushed us in the direction of integratic a control and management of these files, mostly because the [OpenSSL](https://www.openssl.org) libraries already include all the functionalities for decoding this format, but they do not apply automatic recognition of the incoming format on functions.\
+\
+In fact, the library functions expect the data to be enclosed between two block separators as shown here, to indicate how to interpret the data.
+
+```
+-----BEGIN PKCS7-----
+V2UgYXJlIHBsZWFzZWQgYnkgeW91IGN1cmlvc2l0eSB0byB1bmNvdmVyIHRoZSBjb250ZW50IG9m
+IG91ciBzYW1wbGUgdGV4dCwgaXQgaXMgbm90IGEgc2ltcGxlIGxvcmVtIGltcHN1bSwgYnV0IGEg
+dGFpbG9yZWQgdGV4dCB3ZSB3cm90ZSBmb3IgeW91LiBXZSB3aXNoIHlvdSBhIGdvb2QgZGF5Lg==
+-----END PKCS7-----
+```
+
+For this reason, a function has been introduced when opening the files, that checks if they are in Base64 format and in this case adds the opening and closing tags.\
+\
+Although the [OpenSSL](https://www.openssl.org) libraries do not support the [URL safe variant alfabet](https://datatracker.ietf.org/doc/html/rfc4648#page-7) of the Base64, this procedure recognizes both alphabets and when needed converts to the standard alphabet.\
+This introduces a possible erroneous behavior in which a file where there is the mixed presence of distinctive elements of the two alphabets should not be considered a valid Base64 encoded file. However, it has been considered and weighted that the occurrence of a binary file falling into this case is so remote that it does not introduce any kind of risk in the use of this library.\
+\
+This feature does not have any effect on all the files that where managed before, taking into account that:
+- every binary file containing values outside the aforementioned alfabets of the Base64 algorithm - excluding CR and LF codes - gets not altered;
+- every Base64-encoded file already containing the tags falls under the aforementioned rule.
+
+Anyone wishing to enable this new feature can simply define the compilation directive.
+
+```delphi
+{$DEFINE PKCS7MANAGEBASE64}
+```
+
+Also present at the top of the `PKCS7Extractor.pas` file.
+
 ## Version history
+
+- Version 1.3.0.0 released June, 15th 2021
+  - added management of Base64-encoded files using OpenSSL libraries' internal method\
+    this functionality is not provided by default but can be enabled by defining the PKCS7MANAGEBASE64 compiler directive.
 
 - Version 1.2.0.0 released March, 2nd 2020
   - added support for files signed using CMS cryptography (requires OpenSSL libraries 0.9.8h+)
@@ -594,10 +637,11 @@ We would like to be able to achieve the full compatibility to every Delphi / Fre
 
 ## Projects for the future
 
-- Manage signature to verify it's validity.
-- Managing certificate store to select which CAs are authoritative.
-- Making this unit compatible with all versions of Delphi.
-- Have the tests results for all Delphi versions, managing a network of volunteers to be able to provide these on each new release.
+This library was born for a goal  which at the moment appears to be fully achieved.\
+Given the longevity of the version we believe that a this time the library can be considered stable and complete.\
+Therefore no other features will be added, some sub-version could be published for the following reasons:
+- Fixes and improvements.
+- Making this unit compatible with all versions of Delphi or other Object Pascal compilers.
 - Compatibility with all possible versions of [OpenSSL](https://www.openssl.org).
 
 ## Thanks
@@ -608,6 +652,13 @@ We would like to be able to achieve the full compatibility to every Delphi / Fre
 - [Diego Rigoni](mailto:diego@gdpitalia.com)
 - [Gianni Giorgetti](https://www.g3cube.net)
 - [Marcello Gribaudo](mailto:marcello.gribaudo@opigi.com)
+
+## Projects using this library
+
+Feel free to use this library where and how you wish, without any obligations, but we really would like to hear from you and put a link to your project in this list.
+
+- [FExpolorer (Fattura Elettronica in Windows Explorer)](https://github.com/EtheaDev/FExplorer) by [Carlo Barazzetta](https://github.com/carloBarazzetta) and [Andrea Magni](https://github.com/andrea-magni)\
+  Open-Source Delphi project of a fully functional Legal Invoices viewer integrated with Windows' shell.
 
 ## Comments
 Any suggestion, contribution and comment will be appreciated.
