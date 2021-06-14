@@ -7,7 +7,7 @@ unit MainFormUnit;
 {***************************************************************************}
 {                                                                           }
 {     PKCS#7 Extractor for Delphi Demo Application                          }
-{     Version 1.2.0.0 released March, 2nd 2020                              }
+{     Version 1.3.0.0 released June, 15th 2021                              }
 {                                                                           }
 {     Copyright (C) 2018 Delphi Club Italia                                 }
 {                        http://www.delphiclubitalia.it                     }
@@ -143,17 +143,25 @@ procedure TFormMain.ChangeLibrary(Sender: TObject);
 var
   F: String;
 begin
+  // Loads last used path.
   F := labelLocation.Caption;
+  // If path doesn't exist, uses application location.
   if not DirectoryExists(F) then
     F := ExtractFilePath(Application.ExeName);
+  // Executes a "Browse for Folder" dialog.
   if BrowseForFolder(Handle, 'Select a folder to load libeay32.dll from.', F) and DirectoryExists(F) then begin
-    if GetModuleHandle('libeay32') > 0 then
+    // Is a library is already loaded, shows a message.
+    if GetModuleHandle(LIBEAY32_LIBRARY) > 0 then
       Application.MessageBox('WARNING: unloading a DLL can be dangerous if you use multiple libraries to manage it''s functions.'#13#10 +
         'This is a controlled example and we don''t have any other library refering to this module in memory or to it''s functions, but '+
         'you should always pay attention because references are not checked again and this will lead to serious crashes.', 'WARNING', MB_ICONEXCLAMATION);
+    // Uninitializes the wrapper.
     PKCS7Extractor.Unload;
+    // Frees currently loaded library (if any).
     FreeLibrary(GetModuleHandle(LIBEAY32_LIBRARY));
+    // Sets wrapper loading folder.
     PKCS7Extractor.SetFolder(F);
+    // Initializes the wrapper again.
     PKCS7Extractor.Load
   end;
   RefreshPanel
@@ -166,27 +174,37 @@ const
 var
   sFolder, sFile, sExtension, S: String;
 begin
+  // Pushes current directory.
   sFolder := GetCurrentDir;
   try
+    // Clearing the UI.
     memoSource.Lines.Clear;
     lblSignatureModeValue.Caption := SIGNATURE_MODE[smUnknown];
     lblVerificationValue.Caption := '(idle)';
+    // Check or tries to initialize the wrapper.
     if not PKCS7Extractor.Load then begin
       Application.MessageBox('Library Libeay32.dll has not been found or an error occurre while loading.', 'Extraction report', MB_ICONEXCLAMATION);
       Exit
     end;
     RefreshPanel;
+    // Executed "Open File" dialog.
     if not odInput.Execute then
       Exit;
+    // If verification fails, shows an error.
     if Verify(odInput.FileName) = vsUnknown then begin
       Application.MessageBox('Selected file is not a supported PKCS#7 message file.', 'Extraction report', MB_ICONEXCLAMATION);
       lblVerificationValue.Caption := VERIFY_STATUS[vsUnknown];
       Exit
     end;
+    // Removes the last extension from filename. Since we expect this file to have the .p7m
+    // extension appended to the original extension, this will mostly restore the original filename.
     sFile := ExpandFilename(ChangeFileExt(odInput.FileName, ''));
+    // If destination file already exists, ask for overwrite permission.
     if FileExists(sFile) then
       case Application.MessageBox(PChar(Format('File "%s" alredy exists, do you want to overwrite?', [sFile])), 'File already exists.', MB_ICONQUESTION or MB_YESNOCANCEL) of
         ID_NO: begin
+          // User asked to avoid overwrite, giving him the opportunity to save the
+          // file to another location / change it's name.
           sExtension := ExtractFileExt(sFile);
           if Copy(sExtension, 1, 1) = '.' then
             Delete(sExtension, 1, 1);
@@ -197,24 +215,31 @@ begin
           if Length(sExtension) > 0 then
             sdOutput.Filter := Format('%s file (*.%s)|*.%s|Any file (*.*)|*.*', [sExtension, sExtension, sExtension]);
           sdOutput.DefaultExt := sExtension;
+          // Shows a "Save File" dialog, if user cancels this, any operation will be cancelled.
           if not sdOutput.Execute then
             Exit;
           sFile := sdOutput.FileName
         end;
-        ID_CANCEL: Exit
+        ID_CANCEL: Exit // User aborts operation.
       end;
     lblVerificationValue.Caption := VERIFY_STATUS[vsUnknown];
+    // Extracts file.
     if Extract(odInput.FileName, sFile) then begin
+      // We now know we can get a valid signature mode for this file.
       lblSignatureModeValue.Caption := SIGNATURE_MODE[SignatureMode(odInput.FileName)];
       S := '';
+      // Extracts the whole file as a string.
       if ExtractToString(odInput.FileName, S) then
         memoSource.Lines.Text := S;
+      // And get verification status for the file.
       lblVerificationValue.Caption := VERIFY_STATUS[Verify(odInput.FileName)];
       Application.MessageBox(PChar(Format('Content of the PKCS#7 message file has been extracted and saved successfully to file "%s".', [sFile])), 'Extraction report', MB_ICONINFORMATION);
     end else begin
+      // Extraction failed.
       Application.MessageBox('Error while extracting data from PKCS#7 message file.', 'Extraction report', MB_ICONEXCLAMATION)
     end
   finally
+    // Pops original directory.
     SetCurrentDir(sFolder)
   end
 end;
@@ -249,6 +274,7 @@ procedure TFormMain.RefreshPanel;
 var
   S: String;
 begin
+  // Gets the folder and version of the currently loaded library from the wrapper.
   S := PKCS7Extractor.GetFolder;
   if Length(S) = 0 then
     S := '(unknown)';
