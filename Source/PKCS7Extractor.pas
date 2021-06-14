@@ -4,10 +4,12 @@ unit PKCS7Extractor;
   {$MODE Delphi}
 {$ENDIF}
 
+{//$DEFINE PKCS7MANAGEBASE64}
+
 {***************************************************************************}
 {                                                                           }
 {     PKCS#7 Extractor library for Delphi                                   }
-{     Version 1.2.0.0 released March, 2nd 2020                              }
+{     Version 1.3.0.0 released June, 15th 2021                              }
 {                                                                           }
 {     Copyright (C) 2018 Delphi Club Italia                                 }
 {                        http://www.delphiclubitalia.it                     }
@@ -106,12 +108,16 @@ function Extract(Stream: TStream; var S: String): Boolean; overload;
 // Utility function to extract the content from a file directly to a String.
 function ExtractToString(const Filename: String; var S: String): Boolean; overload;
 
+// Gets the verification status for a stream.
 function Verify(Stream: TStream): TVerifyStatus; overload;
 
+// Gets the verification status for a file.
 function Verify(const Filename: String): TVerifyStatus; overload;
 
+// Gets signature mode for a stream.
 function SignatureMode(Stream: TStream): TSignatureMode; overload;
 
+// Gets signature mode for a file.
 function SignatureMode(const Filename: String): TSignatureMode; overload;
 
 implementation
@@ -412,6 +418,127 @@ begin
     Result := Result and (mFunctions.Functions[I] <> nil)
 end;
 
+// ==================================================== BASE64 CHECK AND PREPARE
+
+{$IFDEF PKCS7MANAGEBASE64}
+const
+  BASE64_BEGIN: AnsiString = '-----BEGIN PKCS7-----'#10; // DO NOT EDIT THIS! DO NOT CHANGE TYPE!
+  BASE64_END: AnsiString = #10'-----END PKCS7-----';     // DO NOT EDIT THIS! DO NOT CHANGE TYPE!
+
+function Base64Prepare(Data: Pointer; iSize, iMemory: Integer): Integer;
+const
+  BASE64_LOOKUP_TABLE: Array[Byte] of Byte = (
+         {00} {01} {02} {03} {04} {05} {06} {07} {08} {09} {0A} {0B} {0C} {0D} {0E} {0F}
+    {00} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $7F, $FF, $FF, $7F, $FF, $FF,
+    {10} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {20} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $3E, $FF, $3E, $FF, $3F,
+    {30} $34, $35, $36, $37, $38, $39, $3A, $3B, $3C, $3D, $FF, $FF, $FF, $FF, $2B, $2F,
+    {40} $FF, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E,
+    {50} $0F, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $FF, $FF, $FF, $FF, $3F,
+    {60} $FF, $1A, $1B, $1C, $1D, $1E, $1F, $20, $21, $22, $23, $24, $25, $26, $27, $28,
+    {70} $29, $2A, $2B, $2C, $2D, $2E, $2F, $30, $31, $32, $33, $FF, $FF, $FF, $FF, $FF,
+    {80} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {90} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {A0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {B0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {C0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {D0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {E0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF,
+    {F0} $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF);
+var
+  I, X, iData, iPadding, iSkip: Int64;
+  OldResult: Integer;
+  P: Pointer;
+begin
+  Result := iSize;
+  // Counts how many Base64 characters are found, both data or padding (only at
+  // the end of the block). CRs and LFs are considered valid but counted for
+  // being skipped in the resulting block.
+  iData := 0;
+  iPadding := 0;
+  iSkip := 0;
+  for I := 0 to iSize - 1 do
+    // This is a padding character
+    if PByteArray(Data)^[I] = $3D then begin
+      // No more than 2 padding characters are allowed at the end of the block.
+      if iPadding < 2 then
+        Inc(iPadding)
+      else
+        Exit
+    end else
+      // Checks for the corresponding Base64 value.
+      case BASE64_LOOKUP_TABLE[PByteArray(Data)^[I]] of
+        // Invalid character outside the Base64 alphabet.
+        $FF: Exit;
+        // CR or LF, will skip this.
+        $7F: Inc(iSkip);
+      else
+        // If I didn't already start the final padding, this is to be considered good data.
+        if iPadding = 0 then
+          Inc(iData)
+        else
+          Exit
+      end;
+  // If data length (including padding) is greater that zero and 32-bit aligned, it's valid Base64 data!
+  if ((iData + iPadding) mod 4 = 0) and ((iData + iPadding) > 0) then begin
+    // If I've found some CRs and LFs, now let's remove them
+    if iSkip > 0 then begin
+      // Pre-calculate resulting buffer size.
+      Result := iSize - iSkip;
+      X := 0;
+      // Allocate a temporary buffer.
+      GetMem(P, Result);
+      try
+        for I := 0 to iSize - 1 do
+          // Converting URL-safe
+          if BASE64_LOOKUP_TABLE[PByteArray(Data)^[I]] = $3E then begin
+            PByteArray(P)^[X] := $2B;
+            Inc(X)
+          end else
+          if BASE64_LOOKUP_TABLE[PByteArray(Data)^[I]] = $3F then begin
+            PByteArray(P)^[X] := $2F;
+            Inc(X)
+          end else
+          // Copy every character to the temporary buffer skipping CRs and LFs.
+          if BASE64_LOOKUP_TABLE[PByteArray(Data)^[I]] <> $7F then begin
+            PByteArray(P)^[X] := PByteArray(Data)^[I];
+            Inc(X)
+          end;
+        // Clear the destination buffer.
+        FillChar(Data^, iMemory, 0);
+        // Copy the temporary buffer to destination.
+        Move(P^, Data^, Result)
+      finally
+        // Release memory used by the temporary buffer.
+        FreeMem(P, Result)
+      end
+    end;
+    // Make a copy of the buffer size.
+    OldResult := Result;
+    // Calculate the length of output buffer include heading and trailing tags.
+    Result := Result + Length(BASE64_BEGIN) + Length(BASE64_END);
+    // Allocate a temporary buffer.
+    GetMem(P, Result);
+    try
+      // Compose final result:
+      // - adds the heading tag;
+      Move(BASE64_BEGIN[1], P^, Length(BASE64_BEGIN));
+      // - adds the Base64 data;
+      Move(Data^, PByteArray(P)^[Length(BASE64_BEGIN)], OldResult);
+      // - adds the trailing tag.
+      Move(BASE64_END[1], PByteArray(P)^[Length(BASE64_BEGIN) + OldResult], Length(BASE64_END));
+      // Clearing the output buffer.
+      FillChar(Data^, iMemory, 0);
+      // Copying data from temporary buffer to output.
+      Move(P^, Data^, Result)
+    finally
+      // Release
+      FreeMem(P, Result)
+    end
+  end
+end;
+{$ENDIF}
+
 // =========================================================== LIBRARY FUNCTIONS
 
 function Extract(InStream, OutStream: TStream): Boolean;
@@ -634,10 +761,11 @@ function TPKCS7Message.LoadFromStream(Stream: TStream): Boolean;
 var
   iRead: Integer;
   iTotalRead: Integer;
+  iTotalMemory: Integer;
   iTotalWritten: Integer;
   iWritten: Integer;
   pCMS: PCMS_ContentInfo;
-  pMemory: Pointer;  
+  pMemory: Pointer;
   pOutputBIO: PBIO;
   pPKCS: PPKCS7;
   pTempBIO: PBIO;
@@ -660,11 +788,22 @@ begin
   pCMS := nil;
   pPKCS := nil;
   try
-    // Allocate memory
-    GetMem(pMemory, iTotalRead);
+    {$IFDEF PKCS7MANAGEBASE64}
+    // Allocate enough memory for Base64 manipulation
+    iTotalMemory := iTotalRead + Length(BASE64_BEGIN) + Length(BASE64_END);
+    {$ELSE}
+    iTotalMemory := iTotalRead;
+    {$ENDIF}
+    GetMem(pMemory, iTotalMemory);
     try
       // Read from stream
       if Stream.Read(pMemory^, iTotalRead) = iTotalRead then begin
+
+        {$IFDEF PKCS7MANAGEBASE64}
+        // Check if it's Base64 data and manage it.
+        iTotalRead := Base64Prepare(pMemory, iTotalRead, iTotalMemory);
+        {$ENDIF}
+
         // Create BIO from this memory
         pTempBIO := mFunctions.BIO_new_mem_buf(pMemory, iTotalRead);
 
@@ -703,7 +842,7 @@ begin
         end
       end
     finally
-      FreeMem(pMemory, iTotalRead)
+      FreeMem(pMemory, iTotalMemory)
     end;
 
     // Can only chech these when using PKCS#7
