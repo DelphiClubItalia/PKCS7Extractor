@@ -25,10 +25,12 @@ Abbiamo pensato che questo non potesse essere il modo professionale di gestire q
     - [Ottenere una lista delle librerie OpenSSL](#ottenere-una-lista-delle-librerie-openssl)
     - [Eseguire i test solo su alcune versioni di OpenSSL](#eseguire-i-test-solo-su-alcune-versioni-di-openssl)
   - [File necessari](#file-necessari)
+  - [Nota sui file codificati Base64](#nota-sui-file-codificati-base64)
   - [Cronologia versioni](#cronologia-versioni)
   - [Compatibilità con i compilatori](#compatibilità-con-i-compilatori)
   - [Progetti per il futuro](#progetti-per-il-futuro)
   - [Ringraziamenti](#ringraziamenti)
+  - [Progetti che utilizzano questa libreria](#progetti-che-utilizzano-questa-libreria)
   - [Commenti](#commenti)
 
 ## File inclusi
@@ -459,7 +461,48 @@ Siamo attualmente alla ricerca delle versioni binarie che ci mancano quindi fate
 Ogni informazioni riguardante problemi di compatibilità sarà benvenuto.
 Si è deciso di ignorare le versioni 1.1.0+ da questa tabella, così come le versioni beta che non sono adatte alla distribuzione.
 
+## Nota sui file codificati Base64
+
+**La libreria non gestisce i file codificati Base64, leggere il presente capitolo per scoprire come abilitarne la gestione.**
+
+Da quando questa libreria è stata rilasciata, siamo spesso stati contattati da persone che utilizzandola hanno trovato dei file che non venivano correttamente gestiti e spesso ci venivano indicati come corrotti o "strani".
+Ad una attenta analisi tutti questi file erano semplicemente codificati attraverso l'[algoritmo Base64](https://datatracker.ietf.org/doc/html/rfc4648) e vista la disponibilità di un gran numero di librerie, componenti o semplici unit che gestiscono tale formato, abbiamo sempre indirizzato altrove per porre rimedio.\
+La scelta di tale modus operandi è stata fatta anche sulla base dei risultati di un sondaggio sulle pagine del [Delphi Club Italia](http://www.delphiclubitalia.it) nel quale infatti è emerso che tale funzionalità avrebbe dovuto esulare da questa libreria in quanto non parte del processo. Molti hanno evidenziato come tanti sviluppatori avessero già risolto in proprio la problematica con una propria implementazione di un decoder Base64.\
+\
+Tuttavia recenti sviluppi ci hanno spinti nella direzione di integrare un controllo ed una gestione di tali file, anche in virtù del fatto che le librerie [OpenSSL](https://www.openssl.org) includono le funzionalità per la decodifica di tale formato, ma non applicano un riconoscimento automatico del formato in entrata delle funzioni.\
+\
+Le funzioni delle librerie si aspettano infatti che i dati siano racchiusi tra due separatori di blocco come qui mostrato per indicare come interpretare il dato.
+
+```
+-----BEGIN PKCS7-----
+Q2kgZmEgcGlhY2VyZSBjaGUgc2lhdGUgY3VyaW9zaSBkaSBjb25vc2NlcmUgaWwgY29udGVudXRv
+IGRlbCBub3N0cm8gdGVzdG8gZGkgcHJvdmEsIG5vbiDDqCB1biBzZW1wbGljZSBsb3JlbSBpbXBz
+dW0sIG1hIHVuIHRlc3QgYWQgaG9jLiBWaSBhdWd1cmlhbW8gdW5hIGJ1b25hIGdpb3JuYXRhLg==
+-----END PKCS7-----
+```
+
+Per questo motivo, si è introdotta una funzione in apertura dei file che verifica se è in formato Base64 ed in tal caso aggiunge i tag di apertura e chiusura di blocco.\
+\
+Nonostante le librerie [OpenSSL](https://www.openssl.org) non supportino la [variante URL safe](https://datatracker.ietf.org/doc/html/rfc4648#page-7) dell'alfabeto di Base64, tale procedura effettua il riconoscimento di entrambi gli alfabeti e eventualmente effettua conversione verso l'alfabeto standard.\
+Ciò introduce un possibile comportamento fallace in quanto un file nel quale vi sia la presenza mista di elementi distintivi dei due alfabeti non dovrebbe essere considerato un file codificato Base64 valido. Tuttavia si è valutato e si ritiene che l'evenienza che un file binario rientri in questa casistica sia talmente remota da non introdurre alcun tipo di problematica nell'utilizzo di questa libreria.\
+\
+Questa modifica non ha alcun effetto su tutti i file che già precedentemente si aprivano tenendo conto che:
+- qualsiasi file binario contenga valori al di fuori dei suddetti alfabeti di Base64 - ad eccezione dei caratteri CR e LF - non viene modificato;
+- qualsiasi file codificato Base64 contenga già tali tag ricade già nella suddetta regola.
+
+Chi volesse abilitare questa novità introdotta può semplicemente definire la direttiva di compilazione
+
+```delphi
+{$DEFINE PKCS7MANAGEBASE64}
+```
+
+Presente anche in testa al file `PKCS7Extractor.pas`.
+
 ## Cronologia versioni
+
+- Versione 1.3.0.0 rilasciata il 15 giugno 2021
+  - aggiunta la gestione dei file codificati Base64 sfruttando un funzionamento interno delle librerie OpenSSL\
+    Tale funzionalità non è attivata di default, ma può esserlo definendo la direttiva di compilazione PKCS7MANAGEBASE64
 
 - Versione 1.2.0.0 rilasciata il 2 marzo 2020
   - aggiunta la gestione dei file firmati utilizzando le funzioni di crittografia CMS (richiede librerie OpenSSL 0.9.8h o successive)
@@ -589,10 +632,11 @@ Vorremmo essere in grado di raggiungere la piena compatiblità con ogni compilat
 
 ## Progetti per il futuro
 
-- Gestione della firma per verificarne la validità.
-- Gestione dello store dei certificati per selezionare quali CA considerare autoritative.
-- Rendere questa unit compatibile con ogni versione di Delphi.
-- Ottenere i risultati dei test in tutte le versioni di Delphi, gestire una rete di volontari in grado di fornire nuovi test per ogni nuova release.
+La libreria è nata per un obiettivo che al momento pare essere stato ampiamente raggiunto.\
+Vista la longevità delle versioni crediamo che a questo punto la libreria si possa definire stabile e completa.\
+Non verranno pertanto aggiunte altre funzionalità, verranno pubblicate eventuali sotto-versioni per le seguenti motivazioni:
+- Correzioni e miglioramenti.
+- Rendere questa unit compatibile con ogni versione di Delphi o compilatore Object Pascal.
 - Compatibilità con ogni possibile versione di [OpenSSL](https://www.openssl.org).
 
 ## Ringraziamenti
@@ -603,6 +647,13 @@ Vorremmo essere in grado di raggiungere la piena compatiblità con ogni compilat
 - [Diego Rigoni](mailto:diego@gdpitalia.com)
 - [Gianni Giorgetti](https://www.g3cube.net)
 - [Marcello Gribaudo](mailto:marcello.gribaudo@opigi.com)
+
+## Progetti che utilizzano questa libreria.
+
+Questa libreria è utilizzabile liberamente dove e come si desidera, senza alcun obbligo. Ci farebbe però piacere avere un vostro feedback e aggiungere a questa lista un collegamento al vostro progetto.
+
+- [FExpolorer (Fattura Elettronica in Windows Explorer)](https://github.com/EtheaDev/FExplorer) di [Carlo Barazzetta](https://github.com/carloBarazzetta) e [Andrea Magni](https://github.com/andrea-magni)\
+  Progetto Open-Source Delphi di un visualizzatore di Fatture Elettroniche con integrazione nella shell di Windows.
 
 ## Commenti
 Qualsiasi suggerimento, contributo o commento sarà veramente apprezzato.
